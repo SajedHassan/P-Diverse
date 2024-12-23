@@ -114,3 +114,9 @@ ENV/
 *.model
 
 !documentation/assets/scribble_example.png
+
+# data and results
+nnunetv2/nnUNet_output/
+nnunetv2/nnUNet_preprocessed/
+nnunetv2/nnUNet_raw/
+nnunetv2/nnUNet_results/
