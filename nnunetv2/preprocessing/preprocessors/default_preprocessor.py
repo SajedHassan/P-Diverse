@@ -112,7 +112,7 @@ class DefaultPreprocessor(object):
             seg = seg.astype(np.int8)
         return data, seg
 
-    def run_case(self, image_files: List[str], seg_file: Union[str, None], plans_manager: PlansManager,
+    def run_case(self, image_files: List[str], seg_file: Union[str, None], type_file: Union[str, None], plans_manager: PlansManager,
                  configuration_manager: ConfigurationManager,
                  dataset_json: Union[dict, str]):
         """
@@ -136,14 +136,24 @@ class DefaultPreprocessor(object):
         else:
             seg = None
 
+        # if possible, load type
+        if type_file is not None:
+            type = rw.read_type(type_file)
+        else:
+            type = None
+
+        # save sample type to properties
+        if type is not None:
+            data_properties['type'] = type
+
         data, seg = self.run_case_npy(data, seg, data_properties, plans_manager, configuration_manager,
                                       dataset_json)
         return data, seg, data_properties
 
-    def run_case_save(self, output_filename_truncated: str, image_files: List[str], seg_file: str,
+    def run_case_save(self, output_filename_truncated: str, image_files: List[str], seg_file: str, type_file: str,
                       plans_manager: PlansManager, configuration_manager: ConfigurationManager,
                       dataset_json: Union[dict, str]):
-        data, seg, properties = self.run_case(image_files, seg_file, plans_manager, configuration_manager, dataset_json)
+        data, seg, properties = self.run_case(image_files, seg_file, type_file, plans_manager, configuration_manager, dataset_json)
         # print('dtypes', data.dtype, seg.dtype)
         np.savez_compressed(output_filename_truncated + '.npz', data=data, seg=seg)
         write_pickle(properties, output_filename_truncated + '.pkl')
@@ -234,10 +244,9 @@ class DefaultPreprocessor(object):
             # p is pretty nifti. If we kill workers they just respawn but don't do any work.
             # So we need to store the original pool of workers.
             workers = [j for j in p._pool]
-
             for k in dataset.keys():
                 r.append(p.starmap_async(self.run_case_save,
-                                         ((join(output_directory, k), dataset[k]['images'], dataset[k]['label'],
+                                         ((join(output_directory, k), dataset[k]['images'], dataset[k]['label'], dataset[k]['type'],
                                            plans_manager, configuration_manager,
                                            dataset_json),)))
 
@@ -283,7 +292,7 @@ def example_test_case_preprocessing():
     # resolution. What comes out of the preprocessor might have been resampled to some other image resolution (as
     # specified by plans)
     plans_manager = PlansManager(plans_file)
-    data, _, properties = pp.run_case(input_images, seg_file=None, plans_manager=plans_manager,
+    data, _, properties = pp.run_case(input_images, seg_file=None, type_file=None, plans_manager=plans_manager,
                                       configuration_manager=plans_manager.get_configuration(configuration),
                                       dataset_json=dataset_json_file)
 

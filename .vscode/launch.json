@@ -1,0 +1,67 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Pre-Process",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "nnunetv2/experiment_planning/plan_and_preprocess_entrypoints.py",
+            "args": [
+                "-d", "15",
+                "-pl", "nnUNetPlannerResEncLWithLearnableEmb",
+                "--verify_dataset_integrity"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "nnunetv2/run/run_training.py",
+            "args": [
+                "15",
+                "2d",
+                "all",
+                "-p", "nnUNetResEncUNetLWithLearnableEmbPlans",
+                "-tr", "nnUNetTrainer_100epochs",
+                "--npz"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Validation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "nnunetv2/run/run_training.py",
+            "args": [
+                "15",
+                "2d",
+                "all",
+                "-p", "nnUNetResEncUNetLWithLearnableEmbPlans",
+                "-tr", "nnUNetTrainer_100epochs",
+                "--val",
+                "--npz"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Pred",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "nnunetv2/inference/predict_from_raw_data.py",
+            "args": [
+                "-d", "Dataset015_NPC-learnable_emb",
+                "-i", "/home/sajed/thesis/nnUNet/nnunetv2/nnUNet_input/Dataset015_NPC-learnable_emb_10_generalized",
+                "-o", "/home/sajed/thesis/nnUNet/nnunetv2/nnUNet_output/Dataset015_NPC-learnable_emb_10_generalized",
+                "-f", "all",
+                "-c", "2d",
+                "-p", "nnUNetResEncUNetLWithLearnableEmbPlans",
+                "-tr", "nnUNetTrainer_100epochs"
+            ],
+            "console": "integratedTerminal"
+        },
+    ]
+}

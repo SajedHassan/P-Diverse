@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Union, List, Tuple
 
 from dynamic_network_architectures.architectures.unet import ResidualEncoderUNet
+from nnunetv2.networks.residual_encoder_unet_with_learnable_emb import ResidualEncoderUNetWithLearnableEmb
 from dynamic_network_architectures.building_blocks.helper import convert_dim_to_conv_op, get_matching_instancenorm
 from nnunetv2.preprocessing.resampling.resample_torch import resample_torch_fornnunet
 from torch import nn
@@ -268,6 +269,29 @@ class nnUNetPlannerResEncL(ResEncUNetPlanner):
         self.UNet_reference_val_2d = 380000000  # 352666667
         self.max_dataset_covered = 1
 
+class nnUNetPlannerResEncLWithLearnableEmb(ResEncUNetPlanner):
+    """
+    Target is ~24 GB VRAM max -> RTX 4090, Titan RTX, Quadro 6000
+    """
+    def __init__(self, dataset_name_or_id: Union[str, int],
+                 gpu_memory_target_in_gb: float = 24,
+                 preprocessor_name: str = 'DefaultPreprocessor', plans_name: str = 'nnUNetResEncUNetLWithLearnableEmbPlans',
+                 overwrite_target_spacing: Union[List[float], Tuple[float, ...]] = None,
+                 suppress_transpose: bool = False):
+        if gpu_memory_target_in_gb != 24:
+            warnings.warn("WARNING: You are running nnUNetPlannerL with a non-standard gpu_memory_target_in_gb. "
+                          f"Expected 24, got {gpu_memory_target_in_gb}."
+                          "You should only see this warning if you modified this value intentionally!!")
+        super().__init__(dataset_name_or_id, gpu_memory_target_in_gb, preprocessor_name, plans_name,
+                         overwrite_target_spacing, suppress_transpose)
+        self.UNet_class = ResidualEncoderUNetWithLearnableEmb
+
+        self.UNet_vram_target_GB = gpu_memory_target_in_gb
+        self.UNet_reference_val_corresp_GB = 24
+
+        self.UNet_reference_val_3d = 2100000000  # 1840000000
+        self.UNet_reference_val_2d = 380000000  # 352666667
+        self.max_dataset_covered = 1
 
 class nnUNetPlannerResEncXL(ResEncUNetPlanner):
     """

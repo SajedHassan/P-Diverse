@@ -2,11 +2,11 @@ import numpy as np
 import torch
 from threadpoolctl import threadpool_limits
 
-from nnunetv2.training.dataloading.base_data_loader import nnUNetDataLoaderBase
+from nnunetv2.training.dataloading.data_loader_2d import nnUNetDataLoader2D
 from nnunetv2.training.dataloading.nnunet_dataset import nnUNetDataset
 
 
-class nnUNetDataLoader2D(nnUNetDataLoaderBase):
+class nnUNetDataLoader2DWithType(nnUNetDataLoader2D):
     def generate_train_batch(self):
         selected_keys = self.get_indices()
         # preallocate memory for data and seg
@@ -109,9 +109,9 @@ class nnUNetDataLoader2D(nnUNetDataLoaderBase):
                         seg_all = torch.stack(segs)
                     del segs, images
 
-            return {'data': data_all, 'target': seg_all, 'keys': selected_keys, 'type': torch.tensor([item['type'] for item in case_properties])}
+            return {'data': data_all, 'target': seg_all, 'keys': selected_keys}
 
-        return {'data': data_all, 'target': seg_all, 'keys': selected_keys, 'type': torch.tensor([item['type'] for item in case_properties])}
+        return {'data': data_all, 'target': seg_all, 'keys': selected_keys}
 
 
 if __name__ == '__main__':

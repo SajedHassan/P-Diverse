@@ -32,6 +32,7 @@ from nnunetv2.utilities.json_export import recursive_fix_for_json_export
 from nnunetv2.utilities.label_handling.label_handling import determine_num_input_channels
 from nnunetv2.utilities.plans_handling.plans_handler import PlansManager, ConfigurationManager
 from nnunetv2.utilities.utils import create_lists_from_splitted_dataset_folder
+from nnunetv2.utilities.utils import create_types_from_splitted_dataset_folder
 
 
 class nnUNetPredictor(object):
@@ -164,10 +165,15 @@ class nnUNetPredictor(object):
                                        num_parts: int = 1,
                                        save_probabilities: bool = False):
         if isinstance(list_of_lists_or_source_folder, str):
-            list_of_lists_or_source_folder = create_lists_from_splitted_dataset_folder(list_of_lists_or_source_folder,
+            source_folder = list_of_lists_or_source_folder
+            list_of_lists_or_source_folder = create_lists_from_splitted_dataset_folder(source_folder,
                                                                                        self.dataset_json['file_ending'])
+        
+            types_list = create_types_from_splitted_dataset_folder(source_folder, '.txt')
+
         print(f'There are {len(list_of_lists_or_source_folder)} cases in the source folder')
         list_of_lists_or_source_folder = list_of_lists_or_source_folder[part_id::num_parts]
+        types_list = types_list[part_id::num_parts]
         caseids = [os.path.basename(i[0])[:-(len(self.dataset_json['file_ending']) + 5)] for i in
                    list_of_lists_or_source_folder]
         print(
@@ -194,7 +200,7 @@ class nnUNetPredictor(object):
             seg_from_prev_stage_files = [seg_from_prev_stage_files[i] for i in not_existing_indices]
             print(f'overwrite was set to {overwrite}, so I am only working on cases that haven\'t been predicted yet. '
                   f'That\'s {len(not_existing_indices)} cases.')
-        return list_of_lists_or_source_folder, output_filename_truncated, seg_from_prev_stage_files
+        return list_of_lists_or_source_folder, output_filename_truncated, seg_from_prev_stage_files, types_list
 
     def predict_from_files(self,
                            list_of_lists_or_source_folder: Union[str, List[List[str]]],
@@ -242,7 +248,7 @@ class nnUNetPredictor(object):
                 f' they are located via folder_with_segs_from_prev_stage'
 
         # sort out input and output filenames
-        list_of_lists_or_source_folder, output_filename_truncated, seg_from_prev_stage_files = \
+        list_of_lists_or_source_folder, output_filename_truncated, seg_from_prev_stage_files, types_list = \
             self._manage_input_and_output_lists(list_of_lists_or_source_folder,
                                                 output_folder_or_list_of_truncated_output_files,
                                                 folder_with_segs_from_prev_stage, overwrite, part_id, num_parts,
@@ -253,7 +259,8 @@ class nnUNetPredictor(object):
         data_iterator = self._internal_get_data_iterator_from_lists_of_filenames(list_of_lists_or_source_folder,
                                                                                  seg_from_prev_stage_files,
                                                                                  output_filename_truncated,
-                                                                                 num_processes_preprocessing)
+                                                                                 num_processes_preprocessing,
+                                                                                 types_list)
 
         return self.predict_from_data_iterator(data_iterator, save_probabilities, num_processes_segmentation_export)
 
@@ -261,8 +268,9 @@ class nnUNetPredictor(object):
                                                             input_list_of_lists: List[List[str]],
                                                             seg_from_prev_stage_files: Union[List[str], None],
                                                             output_filenames_truncated: Union[List[str], None],
-                                                            num_processes: int):
-        return preprocessing_iterator_fromfiles(input_list_of_lists, seg_from_prev_stage_files,
+                                                            num_processes: int,
+                                                            types_list: List[List[str]]):
+        return preprocessing_iterator_fromfiles(input_list_of_lists, seg_from_prev_stage_files, types_list,
                                                 output_filenames_truncated, self.plans_manager, self.dataset_json,
                                                 self.configuration_manager, num_processes, self.device.type == 'cuda',
                                                 self.verbose_preprocessing)
@@ -364,6 +372,7 @@ class nnUNetPredictor(object):
                 print(f'perform_everything_on_device: {self.perform_everything_on_device}')
 
                 properties = preprocessed['data_properties']
+                type = torch.tensor(properties['type'])
 
                 # let's not get into a runaway situation where the GPU predicts so fast that the disk has to b swamped with
                 # npy files
@@ -372,7 +381,7 @@ class nnUNetPredictor(object):
                     sleep(0.1)
                     proceed = not check_workers_alive_and_busy(export_pool, worker_list, r, allowed_num_queued=2)
 
-                prediction = self.predict_logits_from_preprocessed_data(data).cpu()
+                prediction = self.predict_logits_from_preprocessed_data(data, type).cpu()
 
                 if ofile is not None:
                     # this needs to go into background processes
@@ -465,7 +474,7 @@ class nnUNetPredictor(object):
             else:
                 return ret
 
-    def predict_logits_from_preprocessed_data(self, data: torch.Tensor) -> torch.Tensor:
+    def predict_logits_from_preprocessed_data(self, data: torch.Tensor, type: torch.Tensor) -> torch.Tensor:
         """
         IMPORTANT! IF YOU ARE RUNNING THE CASCADE, THE SEGMENTATION FROM THE PREVIOUS STAGE MUST ALREADY BE STACKED ON
         TOP OF THE IMAGE AS ONE-HOT REPRESENTATION! SEE PreprocessAdapter ON HOW THIS SHOULD BE DONE!
@@ -489,9 +498,9 @@ class nnUNetPredictor(object):
             # second iteration to crash due to OOM. Grabbing that with try except cause way more bloated code than
             # this actually saves computation time
             if prediction is None:
-                prediction = self.predict_sliding_window_return_logits(data).to('cpu')
+                prediction = self.predict_sliding_window_return_logits(data, type).to('cpu')
             else:
-                prediction += self.predict_sliding_window_return_logits(data).to('cpu')
+                prediction += self.predict_sliding_window_return_logits(data, type).to('cpu')
 
         if len(self.list_of_parameters) > 1:
             prediction /= len(self.list_of_parameters)
@@ -534,9 +543,9 @@ class nnUNetPredictor(object):
                                                   zip((sx, sy, sz), self.configuration_manager.patch_size)]]))
         return slicers
 
-    def _internal_maybe_mirror_and_predict(self, x: torch.Tensor) -> torch.Tensor:
+    def _internal_maybe_mirror_and_predict(self, x: torch.Tensor, type: torch.Tensor) -> torch.Tensor:
         mirror_axes = self.allowed_mirroring_axes if self.use_mirroring else None
-        prediction = self.network(x)
+        prediction = self.network(x, type)
 
         if mirror_axes is not None:
             # check for invalid numbers in mirror_axes
@@ -548,12 +557,13 @@ class nnUNetPredictor(object):
                 c for i in range(len(mirror_axes)) for c in itertools.combinations(mirror_axes, i + 1)
             ]
             for axes in axes_combinations:
-                prediction += torch.flip(self.network(torch.flip(x, axes)), axes)
+                prediction += torch.flip(self.network(torch.flip(x, axes), type), axes)
             prediction /= (len(axes_combinations) + 1)
         return prediction
 
     def _internal_predict_sliding_window_return_logits(self,
                                                        data: torch.Tensor,
+                                                       type: torch.Tensor,
                                                        slicers,
                                                        do_on_device: bool = True,
                                                        ):
@@ -567,6 +577,7 @@ class nnUNetPredictor(object):
             if self.verbose:
                 print(f'move image to device {results_device}')
             data = data.to(results_device)
+            type = type.to(results_device)
 
             # preallocate arrays
             if self.verbose:
@@ -589,7 +600,7 @@ class nnUNetPredictor(object):
                 workon = data[sl][None]
                 workon = workon.to(self.device)
 
-                prediction = self._internal_maybe_mirror_and_predict(workon)[0].to(results_device)
+                prediction = self._internal_maybe_mirror_and_predict(workon, type)[0].to(results_device)
 
                 if self.use_gaussian:
                     prediction *= gaussian
@@ -609,7 +620,7 @@ class nnUNetPredictor(object):
             raise e
         return predicted_logits
 
-    def predict_sliding_window_return_logits(self, input_image: torch.Tensor) \
+    def predict_sliding_window_return_logits(self, input_image: torch.Tensor, type) \
             -> Union[np.ndarray, torch.Tensor]:
         with torch.no_grad():
             assert isinstance(input_image, torch.Tensor)
@@ -642,15 +653,15 @@ class nnUNetPredictor(object):
                 if self.perform_everything_on_device and self.device != 'cpu':
                     # we need to try except here because we can run OOM in which case we need to fall back to CPU as a results device
                     try:
-                        predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers,
+                        predicted_logits = self._internal_predict_sliding_window_return_logits(data, type, slicers,
                                                                                                self.perform_everything_on_device)
                     except RuntimeError:
                         print(
                             'Prediction on device was unsuccessful, probably due to a lack of memory. Moving results arrays to CPU')
                         empty_cache(self.device)
-                        predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers, False)
+                        predicted_logits = self._internal_predict_sliding_window_return_logits(data, type, slicers, False)
                 else:
-                    predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers,
+                    predicted_logits = self._internal_predict_sliding_window_return_logits(data, type, slicers,
                                                                                            self.perform_everything_on_device)
 
                 empty_cache(self.device)
@@ -699,7 +710,7 @@ class nnUNetPredictor(object):
                 f' they are located via folder_with_segs_from_prev_stage'
 
         # sort out input and output filenames
-        list_of_lists_or_source_folder, output_filename_truncated, seg_from_prev_stage_files = \
+        list_of_lists_or_source_folder, output_filename_truncated, seg_from_prev_stage_files, types_list = \
             self._manage_input_and_output_lists(list_of_lists_or_source_folder,
                                                 output_folder_or_list_of_truncated_output_files,
                                                 folder_with_segs_from_prev_stage, overwrite, 0, 1,
@@ -978,23 +989,23 @@ def predict_entry_point():
 
 if __name__ == '__main__':
     ########################## predict a bunch of files
-    from nnunetv2.paths import nnUNet_results, nnUNet_raw
+    # from nnunetv2.paths import nnUNet_results, nnUNet_raw
 
-    predictor = nnUNetPredictor(
-        tile_step_size=0.5,
-        use_gaussian=True,
-        use_mirroring=True,
-        perform_everything_on_device=True,
-        device=torch.device('cuda', 0),
-        verbose=False,
-        verbose_preprocessing=False,
-        allow_tqdm=True
-    )
-    predictor.initialize_from_trained_model_folder(
-        join(nnUNet_results, 'Dataset004_Hippocampus/nnUNetTrainer_5epochs__nnUNetPlans__3d_fullres'),
-        use_folds=(0,),
-        checkpoint_name='checkpoint_final.pth',
-    )
+    # predictor = nnUNetPredictor(
+    #     tile_step_size=0.5,
+    #     use_gaussian=True,
+    #     use_mirroring=True,
+    #     perform_everything_on_device=True,
+    #     device=torch.device('cuda', 0),
+    #     verbose=False,
+    #     verbose_preprocessing=False,
+    #     allow_tqdm=True
+    # )
+    # predictor.initialize_from_trained_model_folder(
+    #     join(nnUNet_results, 'Dataset004_Hippocampus/nnUNetTrainer_5epochs__nnUNetPlans__3d_fullres'),
+    #     use_folds=(0,),
+    #     checkpoint_name='checkpoint_final.pth',
+    # )
     # predictor.predict_from_files(join(nnUNet_raw, 'Dataset003_Liver/imagesTs'),
     #                              join(nnUNet_raw, 'Dataset003_Liver/imagesTs_predlowres'),
     #                              save_probabilities=False, overwrite=False,
@@ -1010,9 +1021,10 @@ if __name__ == '__main__':
     # iterator = predictor.get_data_iterator_from_raw_npy_data([img], None, [props], None, 1)
     # ret = predictor.predict_from_data_iterator(iterator, False, 1)
 
-    ret = predictor.predict_from_files_sequential(
-        [['/media/isensee/raw_data/nnUNet_raw/Dataset004_Hippocampus/imagesTs/hippocampus_002_0000.nii.gz'], ['/media/isensee/raw_data/nnUNet_raw/Dataset004_Hippocampus/imagesTs/hippocampus_005_0000.nii.gz']],
-        '/home/isensee/temp/tmp', False, True, None
-    )
+    # ret = predictor.predict_from_files_sequential(
+    #     [['/media/isensee/raw_data/nnUNet_raw/Dataset004_Hippocampus/imagesTs/hippocampus_002_0000.nii.gz'], ['/media/isensee/raw_data/nnUNet_raw/Dataset004_Hippocampus/imagesTs/hippocampus_005_0000.nii.gz']],
+    #     '/home/isensee/temp/tmp', False, True, None
+    # )
+    predict_entry_point()
 
 

@@ -114,6 +114,12 @@ class SimpleITKIO(BaseReaderWriter):
     def read_seg(self, seg_fname: str) -> Tuple[np.ndarray, dict]:
         return self.read_images((seg_fname, ))
 
+    def read_type(self, type_fname: str) -> int:
+        file = open(type_fname, 'r')
+        type = int(file.readline().strip())
+        file.close()
+        return type
+
     def write_seg(self, seg: np.ndarray, output_fname: str, properties: dict) -> None:
         assert seg.ndim == 3, 'segmentation must be 3d. If you are exporting a 2d segmentation, please provide it as shape 1,x,y'
         output_dimension = len(properties['sitk_stuff']['spacing'])

@@ -16,6 +16,7 @@ from nnunetv2.utilities.plans_handling.plans_handler import PlansManager, Config
 
 def preprocess_fromfiles_save_to_queue(list_of_lists: List[List[str]],
                                        list_of_segs_from_prev_stage_files: Union[None, List[str]],
+                                       types_list: List[List[str]],
                                        output_filenames_truncated: Union[None, List[str]],
                                        plans_manager: PlansManager,
                                        dataset_json: dict,
@@ -31,6 +32,7 @@ def preprocess_fromfiles_save_to_queue(list_of_lists: List[List[str]],
             data, seg, data_properties = preprocessor.run_case(list_of_lists[idx],
                                                                list_of_segs_from_prev_stage_files[
                                                                    idx] if list_of_segs_from_prev_stage_files is not None else None,
+                                                                types_list[idx][0],
                                                                plans_manager,
                                                                configuration_manager,
                                                                dataset_json)
@@ -60,6 +62,7 @@ def preprocess_fromfiles_save_to_queue(list_of_lists: List[List[str]],
 
 def preprocessing_iterator_fromfiles(list_of_lists: List[List[str]],
                                      list_of_segs_from_prev_stage_files: Union[None, List[str]],
+                                     types_list: List[List[str]],
                                      output_filenames_truncated: Union[None, List[str]],
                                      plans_manager: PlansManager,
                                      dataset_json: dict,
@@ -83,6 +86,7 @@ def preprocessing_iterator_fromfiles(list_of_lists: List[List[str]],
                          list_of_lists[i::num_processes],
                          list_of_segs_from_prev_stage_files[
                          i::num_processes] if list_of_segs_from_prev_stage_files is not None else None,
+                         types_list[i::num_processes],
                          output_filenames_truncated[
                          i::num_processes] if output_filenames_truncated is not None else None,
                          plans_manager,
