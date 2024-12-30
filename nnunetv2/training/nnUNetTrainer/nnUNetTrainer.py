@@ -530,9 +530,12 @@ class nnUNetTrainer(object):
 
                 import hiddenlayer as hl
                 g = hl.build_graph(self.network,
-                                   torch.rand((1, self.num_input_channels,
+                                   (
+                                        torch.rand((1, self.num_input_channels,
                                                *self.configuration_manager.patch_size),
                                               device=self.device),
+                                        torch.tensor(1).to(self.device)
+                                   ),
                                    transforms=None)
                 g.save(join(self.output_folder, "network_architecture.pdf"))
                 del g
