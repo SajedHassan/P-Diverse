@@ -46,7 +46,7 @@ class ResidualEncoderUNetWithLearnableEmb(nn.Module):
                                                                 f"as we have resolution stages. here: {n_stages} " \
                                                                 f"stages, so it should have {n_stages - 1} entries. " \
                                                                 f"n_conv_per_stage_decoder: {n_conv_per_stage_decoder}"
-        num_embeddings, embedding_dim = 4, 32
+        num_embeddings, embedding_dim = 10, 32
         self.embedder = nn.Embedding(num_embeddings, embedding_dim)
 
         self.encoder = ResidualEncoderWithLearnableEmb(input_channels, n_stages, features_per_stage, conv_op, kernel_sizes, strides,

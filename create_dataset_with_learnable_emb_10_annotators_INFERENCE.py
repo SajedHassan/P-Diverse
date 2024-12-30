@@ -9,7 +9,7 @@ base_dataset_folders = [
     '/home/sajed/thesis/MMIS/dataset/splitted/training_2d/a2/',
     '/home/sajed/thesis/MMIS/dataset/splitted/training_2d/a3/'
 ]
-target_dataset_images_folder = '/home/sajed/thesis/nnUNet/nnunetv2/nnUNet_input/Dataset015_NPC-learnable_emb_10_generalized/'
+target_dataset_images_folder = '/home/sajed/thesis/nnUNet/nnunetv2/nnUNet_input/Dataset017_NPC-learnable_emb_10_annotators/'
 
 index = 1
 
