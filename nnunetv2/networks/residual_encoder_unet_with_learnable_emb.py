@@ -2,7 +2,7 @@ from typing import Union, Type, List, Tuple
 
 import torch
 from dynamic_network_architectures.building_blocks.helper import convert_conv_op_to_dim
-from dynamic_network_architectures.building_blocks.residual import BasicBlockD, BottleneckD
+from nnunetv2.networks.encoders.stacked_residual_blocks_modulated import BasicBlockD, BottleneckD
 from nnunetv2.networks.encoders.residual_encoder_with_learnable_emb import ResidualEncoderWithLearnableEmb
 from nnunetv2.networks.decoders.unet_decoder_with_learnable_emb import UNetDecoderWithLearnableEmb
 from dynamic_network_architectures.initialization.weight_init import InitWeights_He

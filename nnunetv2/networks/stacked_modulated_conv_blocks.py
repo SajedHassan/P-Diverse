@@ -209,23 +209,34 @@ class StackedModulatedConvBlocks(nn.Module):
             norm_op_kwargs, dropout_op, dropout_op_kwargs, nonlin, nonlin_kwargs, nonlin_first
         )
     
-        self.convs_with_embeddings_1 = ModulatedConvDropoutNormReLU(
-            conv_op, output_channels[1], output_channels[1], kernel_size, 1, conv_bias, norm_op,
-            norm_op_kwargs, dropout_op, dropout_op_kwargs, nonlin, nonlin_kwargs, nonlin_first
-        )
+        if len(output_channels) > 1:
+            self.convs_with_embeddings_1 = ModulatedConvDropoutNormReLU(
+                conv_op, output_channels[1], output_channels[1], kernel_size, 1, conv_bias, norm_op,
+                norm_op_kwargs, dropout_op, dropout_op_kwargs, nonlin, nonlin_kwargs, nonlin_first
+            )
+        else:
+            self.convs_with_embeddings_1 = None
 
-        self.convs_with_embeddings_2 = ModulatedConvDropoutNormReLU(
-            conv_op, output_channels[2], output_channels[2], kernel_size, 1, conv_bias, norm_op,
-            norm_op_kwargs, dropout_op, dropout_op_kwargs, nonlin, nonlin_kwargs, nonlin_first
-        )
+        if len(output_channels) > 2:
+            self.convs_with_embeddings_2 = ModulatedConvDropoutNormReLU(
+                conv_op, output_channels[2], output_channels[2], kernel_size, 1, conv_bias, norm_op,
+                norm_op_kwargs, dropout_op, dropout_op_kwargs, nonlin, nonlin_kwargs, nonlin_first
+            )
+        else:
+            self.convs_with_embeddings_2 = None
 
         self.output_channels = output_channels[-1]
         self.initial_stride = maybe_convert_scalar_to_list(conv_op, initial_stride)
 
     def forward(self, x, type_embeddings):
-        temp = self.convs_without_embeddings(x)
-        temp1 = self.convs_with_embeddings_1(temp, type_embeddings)
-        return self.convs_with_embeddings_2(temp1, type_embeddings)
+        ret = x
+        ret = self.convs_without_embeddings(ret)
+        if self.convs_with_embeddings_1 is not None:
+            ret = self.convs_with_embeddings_1(ret, type_embeddings)
+        if self.convs_with_embeddings_2 is not None:
+            ret = self.convs_with_embeddings_2(ret, type_embeddings)
+
+        return ret
 
     def compute_conv_feature_map_size(self, input_size):
         assert len(input_size) == len(self.initial_stride), "just give the image size without color/feature channels or " \
@@ -233,15 +244,17 @@ class StackedModulatedConvBlocks(nn.Module):
                                                             "Give input_size=(x, y(, z))!"
         output = self.convs_without_embeddings.compute_conv_feature_map_size(input_size)
         size_after_stride = [i // j for i, j in zip(input_size, self.initial_stride)]
-        output += self.convs_with_embeddings_1.compute_conv_feature_map_size(size_after_stride)
-        output += self.convs_with_embeddings_2.compute_conv_feature_map_size(size_after_stride)
+        if self.convs_with_embeddings_1 is not None:
+            output += self.convs_with_embeddings_1.compute_conv_feature_map_size(size_after_stride)
+        if self.convs_with_embeddings_2 is not None:
+            output += self.convs_with_embeddings_2.compute_conv_feature_map_size(size_after_stride)
         return output
 
 
 if __name__ == '__main__':
     data = torch.rand((1, 3, 40, 32))
 
-    stx = StackedModulatedConvBlocks(2, nn.Conv2d, 24, 16, (3, 3), 2,
+    stx = StackedModulatedConvBlocks(3, nn.Conv2d, 24, 16, (3, 3), 2,
                             norm_op=nn.BatchNorm2d, nonlin=nn.ReLU, nonlin_kwargs={'inplace': True},
                             )
     model = nn.Sequential(ModulatedConvDropoutNormReLU(nn.Conv2d,

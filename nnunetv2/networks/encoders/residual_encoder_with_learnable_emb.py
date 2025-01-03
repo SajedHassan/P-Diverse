@@ -5,7 +5,7 @@ from typing import Union, Type, List, Tuple
 
 from torch.nn.modules.conv import _ConvNd
 from torch.nn.modules.dropout import _DropoutNd
-from dynamic_network_architectures.building_blocks.residual import StackedResidualBlocks, BottleneckD, BasicBlockD
+from nnunetv2.networks.encoders.stacked_residual_blocks_modulated import StackedResidualBlocksModulated, BottleneckD, BasicBlockD
 from dynamic_network_architectures.building_blocks.helper import maybe_convert_scalar_to_list, get_matching_pool_op
 from nnunetv2.networks.stacked_modulated_conv_blocks import StackedModulatedConvBlocks
 
@@ -102,7 +102,7 @@ class ResidualEncoderWithLearnableEmb(nn.Module):
         for s in range(n_stages):
             stride_for_conv = strides[s] if pool_op is None else 1
 
-            stage = StackedResidualBlocks(
+            stage = StackedResidualBlocksModulated(
                 n_blocks_per_stage[s], conv_op, input_channels, features_per_stage[s], kernel_sizes[s], stride_for_conv,
                 conv_bias, norm_op, norm_op_kwargs, dropout_op, dropout_op_kwargs, nonlin, nonlin_kwargs,
                 block=block, bottleneck_channels=bottleneck_channels[s], stochastic_depth_p=stochastic_depth_p,
@@ -137,7 +137,7 @@ class ResidualEncoderWithLearnableEmb(nn.Module):
             x = self.stem(x, type_embeddings)
         ret = []
         for s in self.stages:
-            x = s(x)
+            x = s(x, type_embeddings)
             ret.append(x)
         if self.return_skips:
             return ret

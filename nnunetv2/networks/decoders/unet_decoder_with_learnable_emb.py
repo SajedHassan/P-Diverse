@@ -5,7 +5,7 @@ from typing import Union, List, Tuple, Type
 
 from torch.nn.modules.dropout import _DropoutNd
 
-from dynamic_network_architectures.building_blocks.simple_conv_blocks import StackedConvBlocks
+from nnunetv2.networks.stacked_modulated_conv_blocks import StackedModulatedConvBlocks
 from dynamic_network_architectures.building_blocks.helper import get_matching_convtransp
 from nnunetv2.networks.encoders.residual_encoder_with_learnable_emb import ResidualEncoderWithLearnableEmb
 from dynamic_network_architectures.building_blocks.plain_conv_encoder import PlainConvEncoder
@@ -75,7 +75,7 @@ class UNetDecoderWithLearnableEmb(nn.Module):
                 bias=conv_bias
             ))
             # input features to conv is 2x input_features_skip (concat input_features_skip with transpconv output)
-            stages.append(StackedConvBlocks(
+            stages.append(StackedModulatedConvBlocks(
                 n_conv_per_stage[s-1], encoder.conv_op, 2 * input_features_skip, input_features_skip,
                 encoder.kernel_sizes[-(s + 1)], 1,
                 conv_bias,
@@ -97,7 +97,7 @@ class UNetDecoderWithLearnableEmb(nn.Module):
         self.transpconvs = nn.ModuleList(transpconvs)
         self.seg_layers = nn.ModuleList(seg_layers)
 
-    def forward(self, skips, tye_embeddings):
+    def forward(self, skips, type_embeddings):
         """
         we expect to get the skips in the order they were computed, so the bottleneck should be the last entry
         :param skips:
@@ -108,7 +108,7 @@ class UNetDecoderWithLearnableEmb(nn.Module):
         for s in range(len(self.stages)):
             x = self.transpconvs[s](lres_input)
             x = torch.cat((x, skips[-(s+2)]), 1)
-            x = self.stages[s](x)
+            x = self.stages[s](x, type_embeddings)
             if self.deep_supervision:
                 seg_outputs.append(self.seg_layers[s](x))
             elif s == (len(self.stages) - 1):
