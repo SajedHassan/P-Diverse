@@ -204,7 +204,7 @@ class StackedModulatedConvBlocks(nn.Module):
         if not isinstance(output_channels, (tuple, list)):
             output_channels = [output_channels] * num_convs
 
-        self.convs_without_embeddings = ConvDropoutNormReLU(
+        self.convs_with_embeddings_0 = ModulatedConvDropoutNormReLU(
             conv_op, input_channels, output_channels[0], kernel_size, initial_stride, conv_bias, norm_op,
             norm_op_kwargs, dropout_op, dropout_op_kwargs, nonlin, nonlin_kwargs, nonlin_first
         )
@@ -230,7 +230,7 @@ class StackedModulatedConvBlocks(nn.Module):
 
     def forward(self, x, type_embeddings):
         ret = x
-        ret = self.convs_without_embeddings(ret)
+        ret = self.convs_with_embeddings_0(ret, type_embeddings)
         if self.convs_with_embeddings_1 is not None:
             ret = self.convs_with_embeddings_1(ret, type_embeddings)
         if self.convs_with_embeddings_2 is not None:
@@ -242,7 +242,7 @@ class StackedModulatedConvBlocks(nn.Module):
         assert len(input_size) == len(self.initial_stride), "just give the image size without color/feature channels or " \
                                                             "batch channel. Do not give input_size=(b, c, x, y(, z)). " \
                                                             "Give input_size=(x, y(, z))!"
-        output = self.convs_without_embeddings.compute_conv_feature_map_size(input_size)
+        output = self.convs_with_embeddings_0.compute_conv_feature_map_size(input_size)
         size_after_stride = [i // j for i, j in zip(input_size, self.initial_stride)]
         if self.convs_with_embeddings_1 is not None:
             output += self.convs_with_embeddings_1.compute_conv_feature_map_size(size_after_stride)
