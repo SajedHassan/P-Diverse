@@ -48,6 +48,7 @@ class ResidualEncoderUNetWithLearnableEmb(nn.Module):
                                                                 f"n_conv_per_stage_decoder: {n_conv_per_stage_decoder}"
         num_embeddings, embedding_dim = 4, 32
         self.embedder = nn.Embedding(num_embeddings, embedding_dim)
+        # self.dec_embedder = nn.Embedding(num_embeddings, embedding_dim)
 
         self.encoder = ResidualEncoderWithLearnableEmb(input_channels, n_stages, features_per_stage, conv_op, kernel_sizes, strides,
                                        n_blocks_per_stage, conv_bias, norm_op, norm_op_kwargs, dropout_op,
@@ -56,9 +57,10 @@ class ResidualEncoderUNetWithLearnableEmb(nn.Module):
         self.decoder = UNetDecoderWithLearnableEmb(self.encoder, num_classes, n_conv_per_stage_decoder, deep_supervision)
 
     def forward(self, x, type):
-        embeddings = self.embedder(type)
-        skips = self.encoder(x, embeddings)
-        return self.decoder(skips, embeddings)
+        stem_embeddings = self.embedder(type)
+        # dec_embeddings = self.dec_embedder(type)
+        skips = self.encoder(x, stem_embeddings)
+        return self.decoder(skips, stem_embeddings)
 
     def compute_conv_feature_map_size(self, input_size):
         assert len(input_size) == convert_conv_op_to_dim(self.encoder.conv_op), "just give the image size without color/feature channels or " \
