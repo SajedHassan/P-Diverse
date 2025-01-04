@@ -8,26 +8,44 @@ from torch.nn.modules.dropout import _DropoutNd
 
 from dynamic_network_architectures.building_blocks.helper import maybe_convert_scalar_to_list
 
-class ModulatedConv2d(nn.Module):
+class SPADE(nn.Module):
     def __init__(self, conv_op: Type[_ConvNd], in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, bias=True):
-        super(ModulatedConv2d, self).__init__()
+        """
+        Args:
+            x_nc: Number of channels in the normalized feature map.
+            label_nc: Number of channels in the input segmentation mask (conditioning input).
+        """
+        super(SPADE, self).__init__()
+        # Instance normalization
         self.conv = conv_op(in_channels, out_channels, kernel_size, stride, padding, bias=bias)
-        self.gamma_fc = nn.Linear(32, out_channels)
-        self.beta_fc = nn.Linear(32, out_channels)
+        self.norm = nn.InstanceNorm2d(out_channels, affine=False)
+        
+        # Learnable layers to produce gamma and beta from the input mask
+        self.mlp_shared = conv_op(32, out_channels, kernel_size, stride, padding, bias=bias)
+        self.mlp_gamma = conv_op(out_channels, out_channels, kernel_size, stride, padding, bias=bias)
+        self.mlp_beta = conv_op(out_channels, out_channels, kernel_size, stride, padding, bias=bias)
 
-    def forward(self, x, embedding):
+    def forward(self, x, type_embedding):
         """
-        x: input feature map [B, C_in, H, W]
-        embedding: modulation vector [B, embedding_dim]
+        Args:
+            x: Input feature map (B, norm_nc, H, W).
+            segmap: Input segmentation map (B, label_nc, H, W).
         """
-        gamma = self.gamma_fc(embedding).unsqueeze(-1).unsqueeze(-1)  # [B, out_channels, 1, 1]
-        beta = self.beta_fc(embedding).unsqueeze(-1).unsqueeze(-1)  # [B, out_channels, 1, 1]
+        # Normalize the input
+        x = self.conv(x)
+        normalized = self.norm(x)
+        
+        type_embedding = type_embedding.unsqueeze(-1).unsqueeze(-1)  # [B, out_channels, 1, 1]
+        # Extract gamma and beta from the segmentation map
+        actv = self.mlp_shared(type_embedding)
+        gamma = self.mlp_gamma(actv)
+        beta = self.mlp_beta(actv)
+        
+        # Apply the modulation
+        out = normalized * (1 + gamma) + beta
+        return out
 
-        x = self.conv(x)  # [B, out_channels, H, W]
-        x = gamma * x + beta  # Modulated feature map
-        return x
-
-class ModulatedConvDropoutNormReLU(nn.Module):
+class ConvSpadeDropoutNormReLU(nn.Module):
     def __init__(self,
                  conv_op: Type[_ConvNd],
                  input_channels: int,
@@ -43,7 +61,7 @@ class ModulatedConvDropoutNormReLU(nn.Module):
                  nonlin_kwargs: dict = None,
                  nonlin_first: bool = False
                  ):
-        super(ModulatedConvDropoutNormReLU, self).__init__()
+        super(ConvSpadeDropoutNormReLU, self).__init__()
         self.input_channels = input_channels
         self.output_channels = output_channels
 
@@ -58,7 +76,7 @@ class ModulatedConvDropoutNormReLU(nn.Module):
         self.stride = stride
         kernel_size = maybe_convert_scalar_to_list(conv_op, kernel_size)
 
-        self.modulated_conv = ModulatedConv2d(
+        self.modulated_conv = SPADE(
             conv_op,
             input_channels,
             output_channels,
@@ -66,7 +84,7 @@ class ModulatedConvDropoutNormReLU(nn.Module):
             stride,
             padding=[(i - 1) // 2 for i in kernel_size],
             dilation=1,
-            bias=conv_bias,
+            bias=conv_bias
         )
 
         if dropout_op is not None:
@@ -166,7 +184,7 @@ class ConvDropoutNormReLU(nn.Module):
         return np.prod([self.output_channels, *output_size], dtype=np.int64)
 
 
-class StackedModulatedConvBlocks(nn.Module):
+class StackedConvBlocksWithSpade(nn.Module):
     def __init__(self,
                  num_convs: int,
                  conv_op: Type[_ConvNd],
@@ -204,13 +222,13 @@ class StackedModulatedConvBlocks(nn.Module):
         if not isinstance(output_channels, (tuple, list)):
             output_channels = [output_channels] * num_convs
 
-        self.convs_without_embeddings = ConvDropoutNormReLU(
+        self.convs_with_embeddings_0 = ConvSpadeDropoutNormReLU(
             conv_op, input_channels, output_channels[0], kernel_size, initial_stride, conv_bias, norm_op,
             norm_op_kwargs, dropout_op, dropout_op_kwargs, nonlin, nonlin_kwargs, nonlin_first
         )
     
         if len(output_channels) > 1:
-            self.convs_with_embeddings_1 = ModulatedConvDropoutNormReLU(
+            self.convs_with_embeddings_1 = ConvSpadeDropoutNormReLU(
                 conv_op, output_channels[1], output_channels[1], kernel_size, 1, conv_bias, norm_op,
                 norm_op_kwargs, dropout_op, dropout_op_kwargs, nonlin, nonlin_kwargs, nonlin_first
             )
@@ -218,7 +236,7 @@ class StackedModulatedConvBlocks(nn.Module):
             self.convs_with_embeddings_1 = None
 
         if len(output_channels) > 2:
-            self.convs_with_embeddings_2 = ModulatedConvDropoutNormReLU(
+            self.convs_with_embeddings_2 = ConvSpadeDropoutNormReLU(
                 conv_op, output_channels[2], output_channels[2], kernel_size, 1, conv_bias, norm_op,
                 norm_op_kwargs, dropout_op, dropout_op_kwargs, nonlin, nonlin_kwargs, nonlin_first
             )
@@ -230,7 +248,7 @@ class StackedModulatedConvBlocks(nn.Module):
 
     def forward(self, x, type_embeddings):
         ret = x
-        ret = self.convs_without_embeddings(ret)
+        ret = self.convs_with_embeddings_0(ret, type_embeddings)
         if self.convs_with_embeddings_1 is not None:
             ret = self.convs_with_embeddings_1(ret, type_embeddings)
         if self.convs_with_embeddings_2 is not None:
@@ -242,7 +260,7 @@ class StackedModulatedConvBlocks(nn.Module):
         assert len(input_size) == len(self.initial_stride), "just give the image size without color/feature channels or " \
                                                             "batch channel. Do not give input_size=(b, c, x, y(, z)). " \
                                                             "Give input_size=(x, y(, z))!"
-        output = self.convs_without_embeddings.compute_conv_feature_map_size(input_size)
+        output = self.convs_with_embeddings_0.compute_conv_feature_map_size(input_size)
         size_after_stride = [i // j for i, j in zip(input_size, self.initial_stride)]
         if self.convs_with_embeddings_1 is not None:
             output += self.convs_with_embeddings_1.compute_conv_feature_map_size(size_after_stride)
@@ -254,10 +272,10 @@ class StackedModulatedConvBlocks(nn.Module):
 if __name__ == '__main__':
     data = torch.rand((1, 3, 40, 32))
 
-    stx = StackedModulatedConvBlocks(3, nn.Conv2d, 24, 16, (3, 3), 2,
+    stx = StackedConvBlocksWithSpade(3, nn.Conv2d, 24, 16, (3, 3), 2,
                             norm_op=nn.BatchNorm2d, nonlin=nn.ReLU, nonlin_kwargs={'inplace': True},
                             )
-    model = nn.Sequential(ModulatedConvDropoutNormReLU(nn.Conv2d,
+    model = nn.Sequential(ConvSpadeDropoutNormReLU(nn.Conv2d,
                                               3, 24, 3, 1, True, nn.BatchNorm2d, {}, None, None, nn.LeakyReLU,
                                               {'inplace': True}),
                           stx)

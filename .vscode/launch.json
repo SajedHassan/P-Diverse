@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "nnunetv2/experiment_planning/plan_and_preprocess_entrypoints.py",
             "args": [
-                "-d", "17",
+                "-d", "19",
                 "-pl", "nnUNetPlannerResEncLWithLearnableEmb",
                 "--verify_dataset_integrity"
             ],
@@ -22,7 +22,7 @@
             "request": "launch",
             "program": "nnunetv2/run/run_training.py",
             "args": [
-                "17",
+                "19",
                 "2d",
                 "all",
                 "-p", "nnUNetResEncUNetLWithLearnableEmbPlans",
@@ -53,9 +53,9 @@
             "request": "launch",
             "program": "nnunetv2/inference/predict_from_raw_data.py",
             "args": [
-                "-d", "Dataset015_NPC-learnable_emb",
+                "-d", "Dataset019_NPC-learnable_emb_spade_enc_dec",
                 "-i", "/home/sajed/thesis/nnUNet/nnunetv2/nnUNet_input/Dataset015_NPC-learnable_emb_testing_data",
-                "-o", "/home/sajed/thesis/nnUNet/nnunetv2/nnUNet_output/Dataset015_NPC-learnable_emb_testing_data",
+                "-o", "/home/sajed/thesis/nnUNet/nnunetv2/nnUNet_output/Dataset019_NPC-learnable_emb_spade_enc_dec_testing_data",
                 "-f", "all",
                 "-c", "2d",
                 "-p", "nnUNetResEncUNetLWithLearnableEmbPlans",
