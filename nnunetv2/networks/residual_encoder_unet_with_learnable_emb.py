@@ -5,6 +5,7 @@ from dynamic_network_architectures.building_blocks.helper import convert_conv_op
 from nnunetv2.networks.encoders.stacked_residual_blocks_with_spade import BasicBlockD, BottleneckD
 from nnunetv2.networks.encoders.residual_encoder_with_learnable_emb import ResidualEncoderWithLearnableEmb
 from nnunetv2.networks.decoders.unet_decoder_with_learnable_emb import UNetDecoderWithLearnableEmb
+from nnunetv2.networks.discriminator import Discriminator
 from dynamic_network_architectures.initialization.weight_init import InitWeights_He
 from dynamic_network_architectures.initialization.weight_init import init_last_bn_before_add_to_0
 from torch import nn
@@ -55,12 +56,15 @@ class ResidualEncoderUNetWithLearnableEmb(nn.Module):
                                        dropout_op_kwargs, nonlin, nonlin_kwargs, block, bottleneck_channels,
                                        return_skips=True, disable_default_stem=False, stem_channels=stem_channels)
         self.decoder = UNetDecoderWithLearnableEmb(self.encoder, num_classes, n_conv_per_stage_decoder, deep_supervision)
+        self.discriminator = Discriminator(2, 64, 'IL')
 
     def forward(self, x, type):
         stem_embeddings = self.embedder(type)
         # dec_embeddings = self.dec_embedder(type)
         skips = self.encoder(x, stem_embeddings)
-        return self.decoder(skips, stem_embeddings)
+        output = self.decoder(skips, stem_embeddings)
+        logists = self.discriminator(output[0] if len(output) > 4 else output)
+        return output, logists
 
     def compute_conv_feature_map_size(self, input_size):
         assert len(input_size) == convert_conv_op_to_dim(self.encoder.conv_op), "just give the image size without color/feature channels or " \

@@ -227,6 +227,9 @@ class nnUNetTrainer(object):
                 self.network = DDP(self.network, device_ids=[self.local_rank])
 
             self.loss = self._build_loss()
+            self.entropy_loss = nn.CrossEntropyLoss()
+            self.entropy_loss_weight = 0.05
+
             # torch 2.2.2 crashes upon compiling CE loss
             # if self._do_i_compile():
             #     self.loss = torch.compile(self.loss)
@@ -997,9 +1000,9 @@ class nnUNetTrainer(object):
         # If the device_type is 'mps' then it will complain that mps is not implemented, even if enabled=False is set. Whyyyyyyy. (this is why we don't make use of enabled=False)
         # So autocast will only be active if we have a cuda device.
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
-            output = self.network(data, type)
+            output, logists = self.network(data, type)
             # del data
-            l = self.loss(output, target)
+            l = self.loss(output, target) + self.entropy_loss_weight + self.entropy_loss(logists, type)
 
         if self.grad_scaler is not None:
             self.grad_scaler.scale(l).backward()
@@ -1046,9 +1049,9 @@ class nnUNetTrainer(object):
         # If the device_type is 'mps' then it will complain that mps is not implemented, even if enabled=False is set. Whyyyyyyy. (this is why we don't make use of enabled=False)
         # So autocast will only be active if we have a cuda device.
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
-            output = self.network(data, type)
+            output, logists = self.network(data, type)
             del data
-            l = self.loss(output, target)
+            l = self.loss(output, target) + self.entropy_loss_weight + self.entropy_loss(logists, type)
 
         # we only need the output with the highest output resolution (if DS enabled)
         if self.enable_deep_supervision:
@@ -1372,6 +1375,9 @@ class nnUNetTrainer(object):
         self.on_train_start()
 
         for epoch in range(self.current_epoch, self.num_epochs):
+            if epoch > 50:
+                self.entropy_loss_weight = 0.1
+
             self.on_epoch_start()
 
             self.on_train_epoch_start()
