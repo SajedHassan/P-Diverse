@@ -12,8 +12,8 @@ class ModulatedConv2d(nn.Module):
     def __init__(self, conv_op: Type[_ConvNd], in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, bias=True):
         super(ModulatedConv2d, self).__init__()
         self.conv = conv_op(in_channels, out_channels, kernel_size, stride, padding, bias=bias)
-        self.gamma_fc = nn.Linear(64, out_channels)
-        self.beta_fc = nn.Linear(64, out_channels)
+        self.gamma_fc = nn.Linear(32, out_channels)
+        self.beta_fc = nn.Linear(32, out_channels)
 
     def forward(self, x, embedding):
         """

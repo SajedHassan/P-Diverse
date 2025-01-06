@@ -21,7 +21,7 @@ class SPADE(nn.Module):
         self.norm = nn.InstanceNorm2d(out_channels, affine=False)
         
         # Learnable layers to produce gamma and beta from the input mask
-        self.mlp_shared = conv_op(64, out_channels, kernel_size, stride, padding, bias=bias)
+        self.mlp_shared = conv_op(32, out_channels, kernel_size, stride, padding, bias=bias)
         self.mlp_gamma = conv_op(out_channels, out_channels, kernel_size, stride, padding, bias=bias)
         self.mlp_beta = conv_op(out_channels, out_channels, kernel_size, stride, padding, bias=bias)
 
