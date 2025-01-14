@@ -7,7 +7,7 @@ from torch.nn.modules.conv import _ConvNd
 from torch.nn.modules.dropout import _DropoutNd
 from nnunetv2.networks.encoders.stacked_residual_blocks_with_spade import StackedResidualBlocksWithSpade, BottleneckD, BasicBlockD
 from dynamic_network_architectures.building_blocks.helper import maybe_convert_scalar_to_list, get_matching_pool_op
-from nnunetv2.networks.stacked_modulated_conv_blocks import StackedModulatedConvBlocks
+from nnunetv2.networks.stacked_conv_blocks_with_spade import StackedConvBlocksWithSpade
 
 
 class ResidualEncoderWithLearnableEmb(nn.Module):
@@ -91,7 +91,7 @@ class ResidualEncoderWithLearnableEmb(nn.Module):
         if not disable_default_stem:
             if stem_channels is None:
                 stem_channels = features_per_stage[0]
-            self.stem = StackedModulatedConvBlocks(3, conv_op, input_channels, stem_channels, kernel_sizes[0], 1, conv_bias,
+            self.stem = StackedConvBlocksWithSpade(3, conv_op, input_channels, stem_channels, kernel_sizes[0], 1, conv_bias,
                                           norm_op, norm_op_kwargs, dropout_op, dropout_op_kwargs, nonlin, nonlin_kwargs)
             input_channels = stem_channels
         else:
