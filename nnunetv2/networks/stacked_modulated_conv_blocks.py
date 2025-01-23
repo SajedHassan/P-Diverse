@@ -22,9 +22,6 @@ class ModulatedConv2d(nn.Module):
         """
         gamma = self.gamma_fc(embedding).unsqueeze(-1).unsqueeze(-1)  # [B, out_channels, 1, 1]
         beta = self.beta_fc(embedding).unsqueeze(-1).unsqueeze(-1)  # [B, out_channels, 1, 1]
-        if len(x.shape) == 5: # 3D
-            gamma = gamma.unsqueeze(-1) # [B, out_channels, 1, 1, 1]
-            beta = beta.unsqueeze(-1) # [B, out_channels, 1, 1, 1]
 
         x = self.conv(x)  # [B, out_channels, H, W]
         x = gamma * x + beta  # Modulated feature map
