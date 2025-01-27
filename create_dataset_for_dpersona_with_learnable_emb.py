@@ -9,8 +9,8 @@ base_dataset_folders = [
     '/home/sajed/thesis/MMIS/dataset/splitted/training_2d/a2/',
     '/home/sajed/thesis/MMIS/dataset/splitted/training_2d/a3/'
 ]
-target_dataset_images_folder = '/home/sajed/thesis/MMIS/dataset/GENERATED_NPC_FROM_NNUNET_WITH_LEARNABLE_EMB/training_2d/'
-generated_data_folder = '/home/sajed/thesis/nnUNet/nnunetv2/nnUNet_output/Dataset015_NPC-learnable_emb/'
+target_dataset_images_folder = '/home/sajed/thesis/MMIS/dataset/GENERATED_NPC_FROM_NNUNET_WITH_LEARNABLE_EMB_E32_SM_ES_DS_F5_P250_(1)/training_2d/'
+generated_data_folder = '/home/sajed/thesis/nnUNet/nnunetv2/nnUNet_output/Dataset021_NPC-learnable_emb_spade_enc_dec_with_validation_250_epochs/'
 
 index = 1
 
