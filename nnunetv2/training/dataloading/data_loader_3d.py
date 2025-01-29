@@ -68,9 +68,9 @@ class nnUNetDataLoader3D(nnUNetDataLoaderBase):
                         seg_all = torch.stack(segs)
                     del segs, images
 
-            return {'data': data_all, 'target': seg_all, 'keys': selected_keys, 'type': torch.tensor([item['type'] for item in case_properties])}
+            return {'data': data_all, 'target': seg_all, 'keys': selected_keys}
 
-        return {'data': data_all, 'target': seg_all, 'keys': selected_keys, 'type': torch.tensor([item['type'] for item in case_properties])}
+        return {'data': data_all, 'target': seg_all, 'keys': selected_keys}
 
 
 if __name__ == '__main__':

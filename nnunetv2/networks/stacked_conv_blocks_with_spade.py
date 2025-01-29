@@ -18,8 +18,7 @@ class SPADE(nn.Module):
         super(SPADE, self).__init__()
         # Instance normalization
         self.conv = conv_op(in_channels, out_channels, kernel_size, stride, padding, bias=bias)
-        self.norm_2d = nn.InstanceNorm2d(out_channels, affine=False)
-        self.norm_3d = nn.InstanceNorm3d(out_channels, affine=False)
+        self.norm = nn.InstanceNorm2d(out_channels, affine=False)
         
         # Learnable layers to produce gamma and beta from the input mask
         self.mlp_shared = conv_op(32, out_channels, kernel_size, stride, padding, bias=bias)
@@ -34,15 +33,9 @@ class SPADE(nn.Module):
         """
         # Normalize the input
         x = self.conv(x)
-        if len(x.shape) == 4:
-            normalized = self.norm_2d(x)
-        else:
-            normalized = self.norm_3d(x)
+        normalized = self.norm(x)
         
         type_embedding = type_embedding.unsqueeze(-1).unsqueeze(-1)  # [B, out_channels, 1, 1]
-        if len(normalized.shape) == 5: # 3D
-            type_embedding = type_embedding.unsqueeze(-1)  # [B, out_channels, 1, 1, 1]
-
         # Extract gamma and beta from the segmentation map
         actv = self.mlp_shared(type_embedding)
         gamma = self.mlp_gamma(actv)
