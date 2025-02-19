@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "nnunetv2/experiment_planning/plan_and_preprocess_entrypoints.py",
             "args": [
-                "-d", "21",
+                "-d", "28",
                 "-pl", "nnUNetPlannerResEncLWithLearnableEmb",
                 "--verify_dataset_integrity"
             ],
